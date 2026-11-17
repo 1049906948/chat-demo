@@ -1,7 +1,14 @@
 import clsx from 'clsx'
 import { useEffect, useMemo, useState } from 'react'
 import { useTranslate } from '../../i18n/index.js'
-import { IconPanelLeftOutline16, IconSettingsOutline16, NewChatIcon } from '../base/icons.js'
+import {
+  IconCloseOutline16,
+  IconListSelectOutline16,
+  IconPanelLeftOutline16,
+  IconSettingsOutline16,
+  IconTrashOutline16,
+  NewChatIcon,
+} from '../base/icons.js'
 import { setSiderCollapsed } from '../../services/settings.js'
 import { groupSessions } from '../../services/chat/sessionGroups.js'
 import { newChat, removeSession, useChatStore } from '../../services/chat/store.js'
@@ -24,6 +31,59 @@ export const Sider = ({ mobile = false }: { mobile?: boolean }) => {
   const groups = useMemo(() => groupSessions(sessions, now, t), [sessions, now, t])
   const [deleting, setDeleting] = useState<SessionSummary | null>(null)
   const [deletePending, setDeletePending] = useState(false)
+  const [selectionMode, setSelectionMode] = useState(false)
+  const [selectedSessionIds, setSelectedSessionIds] = useState<Set<string>>(() => new Set())
+  const [deletingSelected, setDeletingSelected] = useState(false)
+  const [batchDeleteCount, setBatchDeleteCount] = useState(0)
+  const [batchDeletePending, setBatchDeletePending] = useState(false)
+  const selectedCount = sessions.reduce(
+    (count, session) => count + Number(selectedSessionIds.has(session.id)),
+    0
+  )
+  const exitSelectionMode = () => {
+    setSelectionMode(false)
+    setSelectedSessionIds(new Set())
+  }
+
+  const toggleSelectedSession = (id: string) => {
+    setSelectedSessionIds((current) => {
+      const next = new Set(current)
+      if (next.has(id)) {
+        next.delete(id)
+      } else {
+        next.add(id)
+      }
+      return next
+    })
+  }
+
+  const deleteSelectedSessions = async () => {
+    const ids = sessions.filter((session) => selectedSessionIds.has(session.id)).map(({ id }) => id)
+    setBatchDeletePending(true)
+    const failedIds: string[] = []
+    try {
+      for (const id of ids) {
+        try {
+          if (!(await removeSession(id))) {
+            failedIds.push(id)
+          }
+        } catch {
+          failedIds.push(id)
+        }
+      }
+      const remainingIds = new Set(useChatStore.getState().sessions.map(({ id }) => id))
+      const remainingFailures = failedIds.filter((id) => remainingIds.has(id))
+      setDeletingSelected(false)
+      if (remainingFailures.length > 0) {
+        setSelectedSessionIds(new Set(remainingFailures))
+        showToast({ key: 'sessionDeleteFailed', type: 'error' })
+      } else {
+        exitSelectionMode()
+      }
+    } finally {
+      setBatchDeletePending(false)
+    }
+  }
 
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout>
@@ -61,29 +121,71 @@ export const Sider = ({ mobile = false }: { mobile?: boolean }) => {
           onClick={() => (mobile ? closeMobileSider() : setSiderCollapsed(true))}
         />
       </div>
-      <button
-        type="button"
-        className={styles.newChat}
-        onClick={() => {
-          newChat()
-          closeMobileSider()
-        }}
-      >
-        <span className={styles.newChatIcon}>
-          <NewChatIcon />
-        </span>
-        {t('newChat')}
-      </button>
-      <div className={styles.listWrap}>
+      {selectionMode ? (
+        <div className={styles.selectionHeader}>
+          <span className={styles.selectionTitle}>{t('selectSessions')}</span>
+          <div className={styles.selectionActions}>
+            {selectedCount > 0 ? (
+              <IconButton
+                icon={<IconTrashOutline16 />}
+                tooltip={t('deleteSelectedSessions')}
+                disabled={batchDeletePending}
+                onClick={() => {
+                  setBatchDeleteCount(selectedCount)
+                  setDeletingSelected(true)
+                }}
+              />
+            ) : null}
+            <IconButton
+              className={styles.selectionClose}
+              icon={<IconCloseOutline16 />}
+              tooltip={t('cancelSelection')}
+              disabled={batchDeletePending}
+              onClick={exitSelectionMode}
+            />
+          </div>
+        </div>
+      ) : (
+        <button
+          type="button"
+          className={styles.newChat}
+          onClick={() => {
+            newChat()
+            closeMobileSider()
+          }}
+        >
+          <span className={styles.newChatIcon}>
+            <NewChatIcon />
+          </span>
+          {t('newChat')}
+        </button>
+      )}
+      <div className={clsx(styles.listWrap, selectionMode && styles.selectionListWrap)}>
         <div className={styles.list}>
-          {groups.map((group) => (
+          {groups.map((group, index) => (
             <div key={group.key} className={styles.section}>
-              <div className={styles.sectionHeader}>{group.label}</div>
+              <div className={styles.sectionHeader}>
+                <span>{group.label}</span>
+                {index === 0 && !selectionMode ? (
+                  <IconButton
+                    className={styles.sectionSelectButton}
+                    size="m"
+                    icon={<IconListSelectOutline16 />}
+                    tooltip={t('selectSessions')}
+                    tooltipPlacement="bottom"
+                    aria-pressed={false}
+                    onClick={() => setSelectionMode(true)}
+                  />
+                ) : null}
+              </div>
               {group.sessions.map((session) => (
                 <SessionItem
                   key={session.id}
                   session={session}
-                  active={session.id === activeId}
+                  active={session.id === activeId && !selectionMode}
+                  selectionMode={selectionMode}
+                  selected={selectedSessionIds.has(session.id)}
+                  onToggleSelected={() => toggleSelectedSession(session.id)}
                   onDelete={() => setDeleting(session)}
                 />
               ))}
@@ -134,6 +236,36 @@ export const Sider = ({ mobile = false }: { mobile?: boolean }) => {
           }
         >
           {t('deleteSessionWithFilesDescription')}
+        </Modal>
+      ) : null}
+      {deletingSelected ? (
+        <Modal
+          title={t('deleteSelectedSessionsModalTitle', { count: batchDeleteCount })}
+          onClose={() => {
+            if (!batchDeletePending) {
+              setDeletingSelected(false)
+            }
+          }}
+          footer={
+            <>
+              <Button
+                variant="outlined"
+                disabled={batchDeletePending}
+                onClick={() => setDeletingSelected(false)}
+              >
+                {t('cancel')}
+              </Button>
+              <Button
+                variant="danger"
+                disabled={batchDeletePending || selectedCount === 0}
+                onClick={() => void deleteSelectedSessions()}
+              >
+                {t(batchDeletePending ? 'historyDeleting' : 'delete')}
+              </Button>
+            </>
+          }
+        >
+          {t('deleteSelectedSessionsDescription')}
         </Modal>
       ) : null}
     </div>
