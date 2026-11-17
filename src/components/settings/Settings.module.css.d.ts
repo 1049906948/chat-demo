@@ -25,6 +25,10 @@ declare const styles: {
   readonly "apiKeySaved": string;
   readonly "apiKeyInput": string;
   readonly "apiKeyMask": string;
+  readonly "apiConfigSummary": string;
+  readonly "apiConfigMeta": string;
+  readonly "apiConfigFields": string;
+  readonly "apiConfigField": string;
   readonly "divider": string;
   readonly "confirm": string;
   readonly "cellButton": string;

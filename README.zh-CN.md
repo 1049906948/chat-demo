@@ -27,6 +27,16 @@ pnpm build
 
 产物位于 `dist/`，可部署到静态服务器，也可直接打开 `dist/index.html`。直接打开时，浏览器和 API 服务需允许 `file://` 页面的存储与跨域请求。
 
+## API 配置
+
+打开「设置 → 数据管理 → API 配置」，选择服务商并填写 API 地址、模型和 API Key。配置保存在当前浏览器，已有的 DeepSeek Key 会沿用默认配置。
+
+- **DeepSeek**：默认地址为 `https://api.deepseek.com/anthropic`，模型为 `deepseek-flash`，保留搜索、链接阅读、附件、语音和继续生成等功能。
+- **阿里云百炼**：预填地址为 `https://dashscope.aliyuncs.com/apps/anthropic`，模型为 `qwen3.8-max`，支持流式文本聊天和深度思考。请根据 Key 所属地域及已开通模型调整配置，地址与模型规则见[百炼 Anthropic 兼容接口文档](https://help.aliyun.com/zh/model-studio/anthropic-api-messages)。
+- **自定义 API**：填写兼容 Anthropic Messages 的 Base URL 和模型名，支持流式文本聊天。当前不支持 OpenAI Chat Completions 协议；Base URL 不包含 `/messages`。
+
+DeepSeek 在保存时通过 `/models` 验证 Key；其他服务在首次发送时返回实际校验结果。API 服务需要允许浏览器跨域请求。百炼和自定义服务暂不接入搜索、附件、语音及回答续写；包含附件的旧问题需切回 DeepSeek 后重新生成。
+
 ## 功能
 
 - 多会话、自动标题、重命名与删除；编辑提问、重新生成和切换消息分支。
@@ -55,7 +65,7 @@ API Key 和设置保存在浏览器 localStorage，会话及附件原件保存�
 
 [rspack.config.ts](rspack.config.ts) 默认连接 `https://api.deepseek.com`。`createConfig({ apiOrigin, devServer })` 支持自定义 API 地址和开发服务器代理。
 
-聊天默认使用 `deepseek-flash`，通过 Anthropic 兼容的 Messages / Files API 通信；语音使用 ASR / TTS 接口。请求使用搜索、链接阅读、标题和 `latest_reminder` 等扩展，接入服务需支持相应能力。附件实际支持的格式以服务端校验为准。
+聊天默认使用 `deepseek-flash`，通过 Anthropic 兼容的 Messages / Files API 通信；语音使用 ASR / TTS 接口。仅 DeepSeek 请求携带搜索、链接阅读、标题和 `latest_reminder` 等扩展，其他服务使用通用 Messages 文本协议。附件实际支持的格式以服务端校验为准。
 
 ```text
 src/

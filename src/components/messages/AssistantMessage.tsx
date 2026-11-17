@@ -6,6 +6,7 @@ import { describeReply } from '../../services/chat/describe.js'
 import { canContinueReply } from '../../services/chat/reply.js'
 import { continueReply, regenerateReply } from '../../services/chat/store.js'
 import { stopReadAloud } from '../../services/speech/readAloud.js'
+import { useSettings } from '../../services/settings.js'
 import type { AssistantMessage as AssistantMessageType } from '../../services/chat/types.js'
 import { openSettings } from '../settings/settingsDialogState.js'
 import { IconButton } from '../base/IconButton.js'
@@ -44,6 +45,9 @@ export const AssistantMessage = memo(function AssistantMessage({
   onSelectVersion: SelectMessageVersion
 }) {
   const t = useTranslate()
+  const apiProvider = useSettings((state) => state.apiProvider)
+  const apiBaseUrl = useSettings((state) => state.apiBaseUrl)
+  const apiModel = useSettings((state) => state.apiModel)
   const view = useReplyView(message, streaming)
   const panelEntry = useSearchPanel((state) => state.entry)
   const notice = streaming ? null : describeReply(message)
@@ -157,7 +161,13 @@ export const AssistantMessage = memo(function AssistantMessage({
               }}
             />
           </div>
-          {isLast && canContinueReply(message) ? (
+          {isLast &&
+          canContinueReply(message, {
+            provider: apiProvider,
+            apiBaseUrl,
+            model: apiModel,
+            apiKey: null,
+          }) ? (
             <Button
               variant="outlined"
               size="s"

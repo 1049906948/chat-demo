@@ -14,6 +14,7 @@ import type {
   ReplyStatus,
   UserMessage,
 } from './types.js'
+import type { ApiConfig } from '../settings.js'
 
 /**
  * 文件按 Files API 的 file_id（附件的 serverId）引用：图片用 image 块，其余用 document 块。
@@ -169,7 +170,18 @@ export const getReplyText = (reply: AssistantMessage) =>
  * 本轮含服务端工具调用或结果（含 READ_LINK 和孤立结果块）的回复不能续写。
  * 服务端模板提示不能作为续写前缀。
  */
-export const canContinueReply = (reply: AssistantMessage): boolean => {
+export const canContinueReply = (reply: AssistantMessage, config?: ApiConfig): boolean => {
+  if (
+    config &&
+    (config.provider !== 'deepseek' ||
+      (reply.model !== null && reply.model !== config.model) ||
+      (reply.apiConfig &&
+        (reply.apiConfig.provider !== config.provider ||
+          reply.apiConfig.apiBaseUrl.replace(/\/+$/, '') !==
+            config.apiBaseUrl.replace(/\/+$/, ''))))
+  ) {
+    return false
+  }
   if (
     !reply.prefix ||
     reply.stopReason === 'refusal' ||
@@ -185,8 +197,7 @@ export const canContinueReply = (reply: AssistantMessage): boolean => {
     return false
   }
   return (
-    reply.status === 'stopped' ||
-    (reply.status === 'done' && reply.stopReason === 'max_tokens')
+    reply.status === 'stopped' || (reply.status === 'done' && reply.stopReason === 'max_tokens')
   )
 }
 
@@ -223,7 +234,8 @@ const toUserParam = ({ content, files }: UserMessage): MessageParam => {
 const toAssistantParam = (
   { blocks }: AssistantMessage,
   prefix = false,
-  thinking = false
+  thinking = false,
+  includeReadLinks = true
 ): Extract<MessageParam, { role: 'assistant' }> => {
   const content: AssistantBlockParam[] = []
   // 成功阅读的网页靠签名恢复正文；缺少有效签名时，调用与结果都不回传。
@@ -263,6 +275,7 @@ const toAssistantParam = (
       const { type, thinking, signature } = block
       content.push({ type, thinking, signature: signature ?? '' })
     } else if (
+      includeReadLinks &&
       block.type === 'server_tool_use' &&
       block.kind === 'read_link' &&
       !unsignedReadLinks.has(block.id)
@@ -270,6 +283,7 @@ const toAssistantParam = (
       const { type, id, name, input, kind } = block
       content.push({ type, id, name, input, kind })
     } else if (
+      includeReadLinks &&
       block.type === 'web_fetch_tool_result' &&
       block.kind === 'read_link' &&
       !unsignedReadLinks.has(block.tool_use_id)
@@ -305,7 +319,8 @@ export const toRequestMessages = (
   question: UserMessage,
   prefix?: AssistantMessage,
   thinking = prefix?.thinking ?? false,
-  latestReminder?: string
+  latestReminder?: string,
+  includeFiles = true
 ): MessageParam[] => {
   const messages: MessageParam[] = []
   let previousReminder: string | undefined
@@ -318,16 +333,24 @@ export const toRequestMessages = (
   }
   for (const [user, reply] of getContextRounds(history)) {
     // 历史提问没有文字、附件也都没有 serverId 时，提问为空，连同回答一起省略。
-    if (!user.content && toFileBlocks(user.files).length === 0) {
+    if (!user.content && (!includeFiles || toFileBlocks(user.files).length === 0)) {
       continue
     }
-    appendReminder(reply.latestReminder)
-    messages.push(toUserParam(user), toAssistantParam(reply))
+    if (includeFiles) {
+      appendReminder(reply.latestReminder)
+    }
+    messages.push(
+      includeFiles ? toUserParam(user) : { role: 'user', content: user.content },
+      toAssistantParam(reply, false, false, includeFiles)
+    )
   }
   appendReminder(latestReminder)
-  messages.push(toUserParam(question))
+  if (!question.content && !includeFiles) {
+    return messages
+  }
+  messages.push(includeFiles ? toUserParam(question) : { role: 'user', content: question.content })
   if (prefix?.prefix) {
-    const assistant = toAssistantParam(prefix, true, thinking)
+    const assistant = toAssistantParam(prefix, true, thinking, includeFiles)
     // 没有非空白正文或有效思考时直接重发原问题，避免服务端拒绝空 Prefill。
     if (
       assistant.content.some(

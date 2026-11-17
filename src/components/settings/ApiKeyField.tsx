@@ -10,9 +10,13 @@ import styles from './Settings.module.css'
 /** API Key 的编辑状态：输入框与移动端底部的「确定」按钮共用 */
 export const useApiKeyEditor = () => {
   const apiKey = useSettings((state) => state.apiKey)
+  const provider = useSettings((state) => state.apiProvider)
+  const apiBaseUrl = useSettings((state) => state.apiBaseUrl)
+  const model = useSettings((state) => state.apiModel)
+  const config = { provider, apiBaseUrl, apiKey, model }
   const [editing, setEditing] = useState(false)
-  const form = useApiKeyForm(() => setEditing(false))
-  return { apiKey, editing, setEditing, form, showInput: !apiKey || editing }
+  const form = useApiKeyForm(config, () => setEditing(false))
+  return { apiKey, config, editing, setEditing, form, showInput: !apiKey || editing }
 }
 
 type ApiKeyEditor = ReturnType<typeof useApiKeyEditor>
@@ -21,15 +25,26 @@ type ApiKeyEditor = ReturnType<typeof useApiKeyEditor>
 export const ApiKeyField = ({ editor }: { editor: ApiKeyEditor }) => {
   const t = useTranslate()
   const isMobile = useIsMobile()
-  const { apiKey, editing, setEditing, form, showInput } = editor
+  const { apiKey, config, editing, setEditing, form, showInput } = editor
 
   return (
     <div className={styles.cell}>
       <div className={styles.apiKey}>
         <div className={styles.label}>{t('apiKeyStart')}</div>
+        <div className={styles.description}>{t('apiConfigHelp')}</div>
         {apiKey && !editing ? (
           <div className={styles.apiKeySaved}>
-            <span className={styles.apiKeyMask}>{'*'.repeat(apiKey.length)}</span>
+            <div className={styles.apiConfigSummary}>
+              <strong>
+                {config.provider === 'deepseek'
+                  ? 'DeepSeek'
+                  : config.provider === 'aliyun'
+                    ? '阿里云百炼'
+                    : 'Custom API'}
+              </strong>
+              <span className={styles.apiKeyMask}>{'*'.repeat(apiKey.length)}</span>
+              <span className={styles.apiConfigMeta}>{config.model}</span>
+            </div>
             <IconButton
               tone="primary"
               icon={<IconEditOutline16 />}
@@ -38,43 +53,77 @@ export const ApiKeyField = ({ editor }: { editor: ApiKeyEditor }) => {
             />
           </div>
         ) : (
-          <div className={styles.apiKeyInput}>
-            <input
-              type="password"
-              placeholder={t('apiKeyPlaceholder')}
-              autoComplete="off"
-              spellCheck={false}
-              // 移动端打开设置时不弹键盘，点编辑后才聚焦
-              autoFocus={!isMobile || editing}
-              value={form.value}
-              onChange={(event) => form.setValue(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter' && !event.nativeEvent.isComposing) {
-                  void form.submit()
-                }
-              }}
-              onBlur={() => {
-                // 修改时没输入就离开，回到已保存的状态
-                if (apiKey && !form.value.trim()) {
-                  setEditing(false)
-                }
-              }}
-            />
-            {!isMobile && form.value.trim() ? (
-              <>
-                <span className={styles.divider} />
-                <button
-                  type="button"
-                  className={styles.confirm}
-                  disabled={form.verifying}
-                  // 保持输入框焦点
-                  onMouseDown={(event) => event.preventDefault()}
-                  onClick={() => void form.submit()}
-                >
-                  {form.verifying ? t('apiKeyVerifying') : t('confirm')}
-                </button>
-              </>
-            ) : null}
+          <div className={styles.apiConfigFields}>
+            <label className={styles.apiConfigField}>
+              <span>{t('apiProvider')}</span>
+              <select
+                disabled={form.verifying}
+                value={form.provider}
+                onChange={(event) => form.setProvider(event.target.value as typeof form.provider)}
+              >
+                <option value="deepseek">DeepSeek</option>
+                <option value="aliyun">阿里云百炼</option>
+                <option value="custom">{t('customApi')}</option>
+              </select>
+            </label>
+            <label className={styles.apiConfigField}>
+              <span>{t('apiBaseUrl')}</span>
+              <input
+                type="url"
+                disabled={form.verifying}
+                placeholder={t('apiBaseUrlPlaceholder')}
+                value={form.baseUrl}
+                onChange={(event) => form.setBaseUrl(event.target.value)}
+                autoComplete="url"
+                spellCheck={false}
+              />
+            </label>
+            <label className={styles.apiConfigField}>
+              <span>{t('apiModel')}</span>
+              <input
+                type="text"
+                disabled={form.verifying}
+                placeholder={t('apiModelPlaceholder')}
+                value={form.model}
+                onChange={(event) => form.setModel(event.target.value)}
+                autoComplete="off"
+                spellCheck={false}
+              />
+            </label>
+            <div className={styles.apiKeyInput}>
+              <input
+                type="password"
+                aria-label="API Key"
+                disabled={form.verifying}
+                placeholder={t('apiKeyPlaceholder')}
+                autoComplete="off"
+                spellCheck={false}
+                // 移动端打开设置时不弹键盘，点编辑后才聚焦
+                autoFocus={!isMobile || editing}
+                value={form.value}
+                onChange={(event) => form.setValue(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' && !event.nativeEvent.isComposing) {
+                    void form.submit()
+                  }
+                }}
+              />
+              {!isMobile && form.canSubmit ? (
+                <>
+                  <span className={styles.divider} />
+                  <button
+                    type="button"
+                    className={styles.confirm}
+                    disabled={form.verifying}
+                    // 保持输入框焦点
+                    onMouseDown={(event) => event.preventDefault()}
+                    onClick={() => void form.submit()}
+                  >
+                    {form.verifying ? t('apiKeyVerifying') : t('confirm')}
+                  </button>
+                </>
+              ) : null}
+            </div>
           </div>
         )}
         {showInput && form.error ? <div className={styles.error}>{form.error}</div> : null}
@@ -86,7 +135,7 @@ export const ApiKeyField = ({ editor }: { editor: ApiKeyEditor }) => {
 /** 移动端：输入 API Key 时在选项下方显示整行「确定」 */
 export const ApiKeyConfirm = ({ editor: { showInput, form } }: { editor: ApiKeyEditor }) => {
   const t = useTranslate()
-  return showInput && form.value.trim() ? (
+  return showInput && form.canSubmit ? (
     <button
       type="button"
       className={styles.mobileConfirm}

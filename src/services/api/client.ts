@@ -8,13 +8,20 @@ import type {
   FilePurpose,
   MessageStreamEvent,
 } from './types.js'
+import type { ApiConfig } from '../settings.js'
 
-/** 构建期 API 地址，默认 https://api.deepseek.com；本地开发支持开发服务器代理 */
-export const API_ORIGIN = __API_ORIGIN__
-/** Anthropic 兼容接口的前缀 */
-const ANTHROPIC_BASE_URL = `${API_ORIGIN}/anthropic/v1`
 /** 引用 Files API 上传的图片、调用 Anthropic 兼容 Files API 时必须携带 */
 const FILES_BETA = 'files-api-2025-04-14'
+
+const baseUrl = (config: ApiConfig) => config.apiBaseUrl.replace(/\/+$/, '')
+
+const v1Url = (config: ApiConfig) => `${baseUrl(config).replace(/\/v1$/, '')}/v1`
+
+const messagesUrl = (config: ApiConfig) => `${v1Url(config)}/messages`
+
+const filesUrl = (config: ApiConfig) => `${v1Url(config)}/files`
+
+const isDeepSeek = (config: ApiConfig) => config.provider === 'deepseek'
 
 export type ApiErrorKind =
   /** 非 2xx 响应 */
@@ -82,18 +89,23 @@ export const request = async (url: string, init: RequestInit): Promise<Response>
   return response
 }
 
-const anthropicHeaders = (apiKey: string, beta: boolean): Record<string, string> => ({
+const anthropicHeaders = (config: ApiConfig, beta: boolean): Record<string, string> => ({
   // DeepSeek 兼容接口的鉴权方式，也可使用 Authorization: Bearer。
-  'x-api-key': apiKey,
+  'x-api-key': config.apiKey ?? '',
+  ...(!isDeepSeek(config) ? { 'anthropic-version': '2023-06-01' } : {}),
   // Files API 和通过 file_id 引用图片时必传；纯文本聊天无需携带。
   ...(beta ? { 'anthropic-beta': FILES_BETA } : {}),
 })
 
-/** 用 GET /models 校验 API Key（不产生费用） */
-export const verifyApiKey = async (apiKey: string, signal?: AbortSignal): Promise<void> => {
-  await request(`${API_ORIGIN}/models`, {
+/** DeepSeek 用 GET /models 校验（不产生费用）；其余服务在首次聊天请求时校验。 */
+export const verifyApiKey = async (config: ApiConfig, signal?: AbortSignal): Promise<void> => {
+  if (!isDeepSeek(config)) {
+    return
+  }
+  const apiRoot = baseUrl(config).replace(/\/anthropic(?:\/v1)?$/, '')
+  await request(`${apiRoot}/models`, {
     method: 'GET',
-    headers: { Authorization: `Bearer ${apiKey}` },
+    headers: { Authorization: `Bearer ${config.apiKey ?? ''}` },
     signal,
   })
 }
@@ -103,7 +115,7 @@ export const verifyApiKey = async (apiKey: string, signal?: AbortSignal): Promis
  * purpose 为 null 时不传该字段（图片）；purpose 必须排在 file 之前。
  */
 export const uploadFile = async (
-  apiKey: string,
+  config: ApiConfig,
   file: File,
   purpose: FilePurpose | null,
   signal?: AbortSignal
@@ -113,9 +125,12 @@ export const uploadFile = async (
     form.append('purpose', purpose)
   }
   form.append('file', file)
-  const response = await request(`${ANTHROPIC_BASE_URL}/files`, {
+  if (!isDeepSeek(config)) {
+    throw new ApiError('protocol', 'File uploads are only configured for DeepSeek.')
+  }
+  const response = await request(filesUrl(config), {
     method: 'POST',
-    headers: anthropicHeaders(apiKey, true),
+    headers: anthropicHeaders(config, true),
     body: form,
     signal,
   })
@@ -123,10 +138,10 @@ export const uploadFile = async (
 }
 
 /** DELETE /anthropic/v1/files/{file_id} */
-export const deleteFile = async (apiKey: string, fileId: string): Promise<void> => {
-  await request(`${ANTHROPIC_BASE_URL}/files/${encodeURIComponent(fileId)}`, {
+export const deleteFile = async (config: ApiConfig, fileId: string): Promise<void> => {
+  await request(`${filesUrl(config)}/${encodeURIComponent(fileId)}`, {
     method: 'DELETE',
-    headers: anthropicHeaders(apiKey, true),
+    headers: anthropicHeaders(config, true),
   })
 }
 
@@ -142,14 +157,14 @@ const hasFile = (body: CreateMessageRequest) =>
  * ping、保活注释与无法解析的内容不产出；中止请求时抛出 signal 的 AbortError。
  */
 export async function* streamMessage(
-  apiKey: string,
+  config: ApiConfig,
   body: CreateMessageRequest,
   signal: AbortSignal
 ): AsyncGenerator<MessageStreamEvent> {
-  const response = await request(`${ANTHROPIC_BASE_URL}/messages`, {
+  const response = await request(messagesUrl(config), {
     method: 'POST',
     headers: {
-      ...anthropicHeaders(apiKey, hasFile(body)),
+      ...anthropicHeaders(config, isDeepSeek(config) && hasFile(body)),
       'Content-Type': 'application/json',
       Accept: 'text/event-stream',
     },

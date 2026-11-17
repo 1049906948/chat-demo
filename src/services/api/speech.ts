@@ -1,4 +1,5 @@
-import { ApiError, API_ORIGIN, request } from './client.js'
+import { ApiError, request } from './client.js'
+import type { ApiConfig } from '../settings.js'
 
 /**
  * 语音接口：
@@ -6,7 +7,12 @@ import { ApiError, API_ORIGIN, request } from './client.js'
  * - TTS：POST /v1/tools/tts，返回音频字节流（产出首帧后即返回 200）
  * 鉴权都用 Authorization: Bearer。
  */
-const TOOLS_BASE_URL = `${API_ORIGIN}/v1/tools`
+const toolsBaseUrl = (config: ApiConfig) => {
+  if (config.provider !== 'deepseek') {
+    throw new ApiError('protocol', 'Speech tools are only configured for DeepSeek.')
+  }
+  return `${config.apiBaseUrl.replace(/\/anthropic(?:\/v1)?\/?$/, '')}/v1/tools`
+}
 
 export type TtsVoice = 'stella' | 'tide'
 
@@ -15,15 +21,15 @@ export const TTS_SAMPLE_RATE = 24000
 
 /** 语音识别：audio 为 WAV（单声道 16-bit PCM）或 Ogg Opus，时长不超过 120 秒、大小不超过 8 MiB */
 export const transcribe = async (
-  apiKey: string,
+  config: ApiConfig,
   audio: Blob,
   signal?: AbortSignal
 ): Promise<string> => {
   const form = new FormData()
   form.append('file', audio, 'recording.wav')
-  const response = await request(`${TOOLS_BASE_URL}/asr`, {
+  const response = await request(`${toolsBaseUrl(config)}/asr`, {
     method: 'POST',
-    headers: { Authorization: `Bearer ${apiKey}` },
+    headers: { Authorization: `Bearer ${config.apiKey ?? ''}` },
     body: form,
     signal,
   })
@@ -47,14 +53,14 @@ export const transcribe = async (
 
 /** 语音合成：返回裸 PCM 字节流；服务端默认过滤代码块、表格、引用标记与长公式 */
 export const synthesize = async (
-  apiKey: string,
+  config: ApiConfig,
   text: string,
   voice: TtsVoice,
   signal: AbortSignal
 ): Promise<ReadableStream<Uint8Array>> => {
-  const response = await request(`${TOOLS_BASE_URL}/tts`, {
+  const response = await request(`${toolsBaseUrl(config)}/tts`, {
     method: 'POST',
-    headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+    headers: { Authorization: `Bearer ${config.apiKey ?? ''}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({ text, voice_id: voice, format: 'pcm', filter_markdown: true }),
     signal,
   })

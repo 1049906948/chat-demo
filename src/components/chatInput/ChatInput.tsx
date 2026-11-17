@@ -7,7 +7,13 @@ import {
   IconStopFill16,
   IconThinkOutline14,
 } from '../base/icons.js'
-import { setSearch, setThinking, useSettings } from '../../services/settings.js'
+import {
+  getApiConfig,
+  isDeepSeekProvider,
+  setSearch,
+  setThinking,
+  useSettings,
+} from '../../services/settings.js'
 import { useIsMobile } from '../../app/viewport.js'
 import { sendMessage, stopReply, useChatStore } from '../../services/chat/store.js'
 import {
@@ -53,6 +59,10 @@ const Input = ({ sessionId }: { sessionId: string | null }) => {
   const importingHistory = useChatStore((state) => state.importingHistory)
   const isMobile = useIsMobile()
   const search = useSettings((state) => state.search)
+  const provider = useSettings((state) => state.apiProvider)
+  const deepSeekFeatures = isDeepSeekProvider(provider)
+  const searchAvailable = deepSeekFeatures
+  const thinkingAvailable = provider !== 'custom'
   const fileInputRef = useRef<HTMLInputElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const togglesRef = useRef<HTMLDivElement>(null)
@@ -75,10 +85,17 @@ const Input = ({ sessionId }: { sessionId: string | null }) => {
   }, [t])
 
   const acceptFiles = (files: File[]) => {
-    if (files.length === 0 || useChatStore.getState().importingHistory || !ensureApiKey()) {
+    if (files.length === 0 || useChatStore.getState().importingHistory) {
       return
     }
-    const error = addDraftFiles(sessionId, files, useSettings.getState().apiKey ?? '')
+    if (!deepSeekFeatures) {
+      showToast(t('apiFeatureUnavailable'))
+      return
+    }
+    if (!ensureApiKey()) {
+      return
+    }
+    const error = addDraftFiles(sessionId, files, getApiConfig())
     if (error) {
       showToast(error)
     }
@@ -86,7 +103,7 @@ const Input = ({ sessionId }: { sessionId: string | null }) => {
   const retryFile = useCallback(
     (id: string) => {
       if (!useChatStore.getState().importingHistory && ensureApiKey()) {
-        retryDraftAttachment(sessionId, id, useSettings.getState().apiKey ?? '')
+        retryDraftAttachment(sessionId, id, getApiConfig())
       }
     },
     [sessionId]
@@ -130,7 +147,12 @@ const Input = ({ sessionId }: { sessionId: string | null }) => {
   const recording = voice.status === 'recording'
 
   // 排队、上传中或上传失败的附件都留在输入框，全部上传成功后才能发送
-  const canSend = !importingHistory && !streaming && voice.status === 'idle' && draftReady
+  const canSend =
+    !importingHistory &&
+    !streaming &&
+    voice.status === 'idle' &&
+    draftReady &&
+    (deepSeekFeatures || attachments.length === 0)
 
   const send = () => {
     if (
@@ -138,6 +160,10 @@ const Input = ({ sessionId }: { sessionId: string | null }) => {
       voice.status !== 'idle' ||
       !prepareDraftMessage(getDraft(sessionId), useUploads.getState().tasks)
     ) {
+      return
+    }
+    if (!deepSeekFeatures && attachments.length > 0) {
+      showToast(t('apiFeatureUnavailable'))
       return
     }
     // 文本与上传完成态由提交动作读取最新快照，不使用上一次渲染的草稿。
@@ -202,24 +228,30 @@ const Input = ({ sessionId }: { sessionId: string | null }) => {
       <div className={styles.functionRow}>
         {/* 深度思考 / 智能搜索开关，tooltip 在按钮上方 */}
         <div ref={togglesRef} className={styles.toggles}>
-          <Tooltip content={t('deactivatedThinkTooltip')}>
+          <Tooltip
+            content={t(thinkingAvailable ? 'deactivatedThinkTooltip' : 'apiFeatureUnavailable')}
+          >
             <button
               type="button"
-              className={clsx(styles.toggle, thinking && styles.selected)}
+              className={clsx(styles.toggle, thinkingAvailable && thinking && styles.selected)}
               aria-label={t('thinkingSwitch')}
-              aria-pressed={thinking}
+              aria-pressed={thinkingAvailable && thinking}
+              disabled={!thinkingAvailable}
               onClick={() => setThinking(!thinking)}
             >
               <IconThinkOutline14 />
               <span className={styles.toggleLabel}>{t('thinkingSwitch')}</span>
             </button>
           </Tooltip>
-          <Tooltip content={t('deactivatedSearchTooltip')}>
+          <Tooltip
+            content={t(searchAvailable ? 'deactivatedSearchTooltip' : 'apiFeatureUnavailable')}
+          >
             <button
               type="button"
-              className={clsx(styles.toggle, search && styles.selected)}
+              className={clsx(styles.toggle, searchAvailable && search && styles.selected)}
               aria-label={t('search')}
-              aria-pressed={search}
+              aria-pressed={searchAvailable && search}
+              disabled={!searchAvailable}
               onClick={() => setSearch(!search)}
             >
               <IconGlobeLanguageOutline14 />
@@ -230,7 +262,10 @@ const Input = ({ sessionId }: { sessionId: string | null }) => {
         <div className={styles.right}>
           <VoiceButton
             status={voice.status}
-            disabled={!voice.available}
+            disabled={!voice.available || !deepSeekFeatures}
+            disabledReason={t(
+              deepSeekFeatures ? 'voiceInputRequiresHttps' : 'apiFeatureUnavailable'
+            )}
             seconds={voice.seconds}
             onClick={() => {
               if (
@@ -245,8 +280,8 @@ const Input = ({ sessionId }: { sessionId: string | null }) => {
             size="m"
             tone="primary"
             icon={<IconPaperclipOutline16 />}
-            tooltip={t('uploadFile')}
-            disabled={importingHistory}
+            tooltip={t(deepSeekFeatures ? 'uploadFile' : 'apiFeatureUnavailable')}
+            disabled={importingHistory || !deepSeekFeatures}
             onClick={() => ensureApiKey() && fileInputRef.current?.click()}
           />
           <input

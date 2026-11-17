@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { TranslationMessage } from '../../i18n/index.js'
 import { transcribe } from '../../services/api/speech.js'
 import { startRecording, type Recording } from '../../services/speech/recorder.js'
-import { useSettings } from '../../services/settings.js'
+import { getApiConfig, useSettings } from '../../services/settings.js'
 import { showToast } from '../base/toastState.js'
 
 export type VoiceInputStatus = 'idle' | 'recording' | 'transcribing'
@@ -75,7 +75,7 @@ export const useVoiceInput = (onText: (text: string) => void) => {
       controller = new AbortController()
       controllerRef.current = controller
       setStatus('transcribing')
-      const text = await transcribe(useSettings.getState().apiKey ?? '', audio, controller.signal)
+      const text = await transcribe(getApiConfig(), audio, controller.signal)
       if (controller.signal.aborted || operationRef.current !== operation) {
         return
       }
@@ -144,6 +144,22 @@ export const useVoiceInput = (onText: (text: string) => void) => {
   }, [status])
 
   useEffect(() => cancelOperation, [cancelOperation])
+
+  // API 配置变更后不再使用旧录音或转写结果，及时释放麦克风和请求。
+  useEffect(
+    () =>
+      useSettings.subscribe((state, previous) => {
+        if (
+          state.apiProvider !== previous.apiProvider ||
+          state.apiBaseUrl !== previous.apiBaseUrl ||
+          state.apiKey !== previous.apiKey ||
+          state.apiModel !== previous.apiModel
+        ) {
+          cancel()
+        }
+      }),
+    [cancel]
+  )
 
   /** 当前录音的频谱分析节点，未录音时为 null */
   const getAnalyser = useCallback(() => recordingRef.current?.analyser ?? null, [])

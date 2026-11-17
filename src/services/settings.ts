@@ -7,9 +7,39 @@ export type Locale = 'zh-CN' | 'en-US'
 /** 主题偏好；默认跟随系统 */
 export type ThemePreference = 'light' | 'dark' | 'system'
 
-/** 本机设置，存 localStorage：API Key、语言、主题、位置、朗读音色、深度思考与智能搜索开关、侧边栏收起状态 */
-type Settings = {
+export type ApiProvider = 'deepseek' | 'aliyun' | 'custom'
+
+export type ApiConfig = {
+  provider: ApiProvider
+  apiBaseUrl: string
   apiKey: string | null
+  model: string
+}
+
+export const DEFAULT_API_CONFIG: Record<ApiProvider, Omit<ApiConfig, 'apiKey'>> = {
+  deepseek: {
+    provider: 'deepseek',
+    apiBaseUrl: `${__API_ORIGIN__.replace(/\/+$/, '')}/anthropic`,
+    model: 'deepseek-flash',
+  },
+  aliyun: {
+    provider: 'aliyun',
+    apiBaseUrl: 'https://dashscope.aliyuncs.com/apps/anthropic',
+    model: 'qwen3.8-max',
+  },
+  custom: {
+    provider: 'custom',
+    apiBaseUrl: '',
+    model: '',
+  },
+}
+
+/** 本机设置，存 localStorage：API 配置、语言、主题、位置、朗读音色、深度思考与智能搜索开关、侧边栏收起状态 */
+type Settings = {
+  apiProvider: ApiProvider
+  apiBaseUrl: string
+  apiKey: string | null
+  apiModel: string
   locale: Locale
   themePreference: ThemePreference
   location: UserLocation | null
@@ -20,7 +50,10 @@ type Settings = {
 }
 
 const KEYS = {
+  apiProvider: 'chat-demo:api-provider',
+  apiBaseUrl: 'chat-demo:api-base-url',
   apiKey: 'chat-demo:api-key',
+  apiModel: 'chat-demo:api-model',
   locale: 'chat-demo:locale',
   location: 'chat-demo:location',
   themePreference: 'chat-demo:theme-preference',
@@ -87,8 +120,41 @@ const initialThemePreference = (): ThemePreference => {
 /** 未保存过时使用服务端默认音色 stella（海星） */
 const initialTtsVoice = (): TtsVoice => (read(KEYS.ttsVoice) === 'tide' ? 'tide' : 'stella')
 
+const initialApiProvider = (): ApiProvider => {
+  const saved = read(KEYS.apiProvider)
+  return saved === 'aliyun' || saved === 'custom' ? saved : 'deepseek'
+}
+
+const initialApiConfig = () => {
+  const provider = initialApiProvider()
+  const defaults = DEFAULT_API_CONFIG[provider]
+  return {
+    provider,
+    apiBaseUrl: read(KEYS.apiBaseUrl) || defaults.apiBaseUrl,
+    apiKey: read(KEYS.apiKey),
+    apiModel: read(KEYS.apiModel) || defaults.model,
+  }
+}
+
+export const isDeepSeekProvider = (provider: ApiProvider) => provider === 'deepseek'
+
+export const getApiConfig = (): ApiConfig => {
+  const state = useSettings.getState()
+  return {
+    provider: state.apiProvider,
+    apiBaseUrl: state.apiBaseUrl,
+    apiKey: state.apiKey,
+    model: state.apiModel,
+  }
+}
+
+const initialApi = initialApiConfig()
+
 export const useSettings = create<Settings>(() => ({
-  apiKey: read(KEYS.apiKey),
+  apiProvider: initialApi.provider,
+  apiBaseUrl: initialApi.apiBaseUrl,
+  apiKey: initialApi.apiKey,
+  apiModel: initialApi.apiModel,
   locale: initialLocale(),
   location: initialLocation(),
   themePreference: initialThemePreference(),
@@ -119,9 +185,17 @@ export const setTtsVoice = (ttsVoice: TtsVoice) => {
   useSettings.setState({ ttsVoice })
 }
 
-export const setApiKey = (apiKey: string | null) => {
-  write(KEYS.apiKey, apiKey)
-  useSettings.setState({ apiKey })
+export const setApiConfig = (config: ApiConfig) => {
+  write(KEYS.apiProvider, config.provider)
+  write(KEYS.apiBaseUrl, config.apiBaseUrl)
+  write(KEYS.apiKey, config.apiKey)
+  write(KEYS.apiModel, config.model)
+  useSettings.setState({
+    apiProvider: config.provider,
+    apiBaseUrl: config.apiBaseUrl,
+    apiKey: config.apiKey,
+    apiModel: config.model,
+  })
 }
 
 export const setThinking = (thinking: boolean) => {

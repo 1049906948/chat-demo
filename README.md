@@ -27,6 +27,16 @@ pnpm build
 
 The output is written to `dist/`. Deploy it to a static web server or open `dist/index.html` directly. Opening the file directly requires browser support for storage on `file://` pages and an API service that permits their cross-origin requests.
 
+## API configuration
+
+Open **Settings → Data → API configuration**, select a provider, and enter the API base URL, model, and API Key. Configuration stays in the current browser. Existing DeepSeek keys retain the default configuration.
+
+- **DeepSeek** defaults to `https://api.deepseek.com/anthropic` with `deepseek-flash`, including search, link reading, attachments, speech, and eligible reply continuation.
+- **Alibaba Cloud Model Studio** defaults to `https://dashscope.aliyuncs.com/apps/anthropic` with `qwen3.8-max`, supporting streaming text and thinking. Adjust the endpoint and model for your key's region and enabled models; see the [Anthropic-compatible API documentation](https://help.aliyun.com/zh/model-studio/anthropic-api-messages).
+- **Custom API** accepts an Anthropic Messages-compatible base URL and model name for streaming text. OpenAI Chat Completions is currently unsupported. The base URL should not include `/messages`.
+
+DeepSeek verifies keys through `/models` before saving. Other services validate them on the first chat request. The API service must allow browser cross-origin requests. Search, attachments, speech, and reply continuation are currently available only with DeepSeek; switch back before regenerating an older question with attachments.
+
 ## Features
 
 - Multiple conversations with automatic titles, renaming, and deletion; edit prompts, regenerate replies, and switch between message branches.
@@ -55,7 +65,7 @@ Settings → Data → Delete all chats clears all local conversations, original 
 
 [rspack.config.ts](rspack.config.ts) uses `https://api.deepseek.com` by default. Use `createConfig({ apiOrigin, devServer })` to customize the API origin and development server proxy.
 
-Chat uses `deepseek-flash` by default through Anthropic-compatible Messages / Files APIs. Speech features use ASR / TTS endpoints. Requests include extensions for search, link reading, titles, and `latest_reminder`, so the configured service must support the corresponding capabilities. Supported attachment formats are determined by server-side validation.
+Chat uses `deepseek-flash` by default through Anthropic-compatible Messages / Files APIs. Speech features use ASR / TTS endpoints. Only DeepSeek requests include extensions for search, link reading, titles, and `latest_reminder`; other providers use the basic Messages text protocol. Supported attachment formats are determined by server-side validation.
 
 ```text
 src/

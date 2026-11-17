@@ -3,7 +3,7 @@ import type { TranslationMessage } from '../../i18n/index.js'
 import { ApiError } from '../api/client.js'
 import { classifyApiError } from '../api/errors.js'
 import { synthesize, TTS_SAMPLE_RATE } from '../api/speech.js'
-import { useSettings } from '../settings.js'
+import { getApiConfig, useSettings } from '../settings.js'
 
 /**
  * 朗读：同一时间只读一条回复。
@@ -42,6 +42,18 @@ export const stopReadAloud = () => {
     finish(controller)
   }
 }
+
+// 服务配置切换时立即停止旧服务的音频，按钮随后按新服务能力更新。
+useSettings.subscribe((state, previous) => {
+  if (
+    state.apiProvider !== previous.apiProvider ||
+    state.apiBaseUrl !== previous.apiBaseUrl ||
+    state.apiKey !== previous.apiKey ||
+    state.apiModel !== previous.apiModel
+  ) {
+    stopReadAloud()
+  }
+})
 
 /** 16-bit 小端 PCM 转成 Float32；奇数字节留到下一段 */
 const toFloat32 = (bytes: Uint8Array) => {
@@ -92,19 +104,23 @@ export const toggleReadAloud = (
   current = { controller, context }
   useReadAloud.setState({ messageId, status: 'loading' })
   // 音色在开始朗读时读取，设置中切换后下一次朗读生效
-  const { apiKey, ttsVoice } = useSettings.getState()
+  const { ttsVoice } = useSettings.getState()
 
   void (async () => {
     let nextTime = 0
     let lastSource: AudioBufferSourceNode | null = null
     let rest = new Uint8Array(0)
     try {
-      const stream = await synthesize(apiKey ?? '', text, ttsVoice, controller.signal)
+      const stream = await synthesize(getApiConfig(), text, ttsVoice, controller.signal)
+      if (controller.signal.aborted) {
+        await stream.cancel().catch(() => {})
+        return
+      }
       const reader = stream.getReader()
       controller.signal.addEventListener('abort', () => void reader.cancel().catch(() => {}))
       for (;;) {
         const { done, value } = await reader.read()
-        if (done) {
+        if (done || controller.signal.aborted) {
           break
         }
         const bytes = new Uint8Array(rest.length + value.length)

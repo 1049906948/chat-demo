@@ -1,4 +1,5 @@
 import type { TranslationMessage } from '../../i18n/index.js'
+import type { ApiConfig } from '../settings.js'
 import type { ApiErrorKind } from '../api/client.js'
 import type {
   ChatModel,
@@ -77,6 +78,8 @@ export type AssistantMessage = MessageBranch & {
   createdAt: number
   /** 未记录模型时为 null，续写使用当前默认模型。 */
   model: ChatModel | null
+  /** 请求接口与模型快照，不保存 Key；避免跨服务续写同一回答。 */
+  apiConfig?: Omit<ApiConfig, 'apiKey'>
   /** 请求时是否开启深度思考 */
   thinking?: boolean
   /** 请求时是否声明 deepseek_web_search；关闭时仍声明 deepseek_read_url */

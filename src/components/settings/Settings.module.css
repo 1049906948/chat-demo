@@ -222,8 +222,10 @@
 }
 
 .apiKeySaved {
+  height: auto;
+  min-height: var(--ds-control-height-xl);
   justify-content: space-between;
-  padding: 0 10px 0 16px;
+  padding: 10px 10px 10px 16px;
   border-radius: 28px;
   background-color: var(--dsw-specific-login-input);
 }
@@ -234,6 +236,66 @@
   white-space: nowrap;
   color: var(--dsw-alias-label-caption);
   user-select: none;
+}
+
+.apiConfigSummary {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.apiConfigSummary strong {
+  color: var(--dsw-alias-label-primary);
+  font-weight: 500;
+}
+
+.apiConfigMeta {
+  overflow: hidden;
+  color: var(--dsw-alias-label-caption);
+  font-size: 12px;
+  line-height: 18px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.apiConfigFields {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.apiConfigField {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 36px;
+  color: var(--dsw-alias-label-secondary);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.apiConfigField > span {
+  flex: 0 0 72px;
+}
+
+.apiConfigField > input,
+.apiConfigField > select {
+  min-width: 0;
+  flex: 1;
+  height: 36px;
+  padding: 0 10px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 8px;
+  outline: none;
+  background: transparent;
+  color: var(--dsw-alias-label-primary);
+  font: inherit;
+}
+
+.apiConfigField > input:focus,
+.apiConfigField > select:focus {
+  border-color: var(--dsw-alias-brand-primary);
 }
 
 .apiKeyInput {
@@ -372,6 +434,24 @@
     border: none;
     border-radius: 40px;
     background-color: var(--dsw-specific-login-input);
+    font-size: 16px;
+  }
+
+  .apiConfigField {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .apiConfigField > span {
+    flex-basis: auto;
+  }
+
+  .apiConfigField > input,
+  .apiConfigField > select {
+    box-sizing: border-box;
+    width: 100%;
+    height: 44px;
     font-size: 16px;
   }
 
