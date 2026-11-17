@@ -41,7 +41,9 @@ export const ApiKeyField = ({ editor }: { editor: ApiKeyEditor }) => {
                   ? 'DeepSeek'
                   : config.provider === 'aliyun'
                     ? '阿里云百炼'
-                    : 'Custom API'}
+                    : config.provider === 'openai'
+                      ? t('openAiCompatible')
+                      : 'Custom API'}
               </strong>
               <span className={styles.apiKeyMask}>{'*'.repeat(apiKey.length)}</span>
               <span className={styles.apiConfigMeta}>{config.model}</span>
@@ -64,6 +66,7 @@ export const ApiKeyField = ({ editor }: { editor: ApiKeyEditor }) => {
               >
                 <option value="deepseek">DeepSeek</option>
                 <option value="aliyun">阿里云百炼</option>
+                <option value="openai">{t('openAiCompatible')}</option>
                 <option value="custom">{t('customApi')}</option>
               </select>
             </label>

@@ -33,7 +33,8 @@ Open **Settings → Data → API configuration**, select a provider, and enter t
 
 - **DeepSeek** defaults to `https://api.deepseek.com/anthropic` with `deepseek-flash`, including search, link reading, attachments, speech, and eligible reply continuation.
 - **Alibaba Cloud Model Studio** defaults to `https://dashscope.aliyuncs.com/apps/anthropic` with `qwen3.8-max`, supporting streaming text and thinking. Adjust the endpoint and model for your key's region and enabled models; see the [Anthropic-compatible API documentation](https://help.aliyun.com/zh/model-studio/anthropic-api-messages).
-- **Custom API** accepts an Anthropic Messages-compatible base URL and model name for streaming text. OpenAI Chat Completions is currently unsupported. The base URL should not include `/messages`.
+- **OpenAI compatible** defaults to Alibaba Cloud Model Studio's `https://dashscope.aliyuncs.com/compatible-mode/v1` endpoint and `qwen-plus`, supporting streaming text. Adjust the endpoint, model, and regional key for your provider.
+- **Custom API** accepts an Anthropic Messages-compatible base URL and model name for streaming text. The base URL should not include `/messages`.
 
 DeepSeek verifies keys through `/models` before saving. Other services validate them on the first chat request. The API service must allow browser cross-origin requests. Search, attachments, speech, and reply continuation are currently available only with DeepSeek; switch back before regenerating an older question with attachments.
 

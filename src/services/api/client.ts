@@ -6,6 +6,7 @@ import type {
   CreateMessageRequest,
   FileObject,
   FilePurpose,
+  MessageUsage,
   MessageStreamEvent,
 } from './types.js'
 import type { ApiConfig } from '../settings.js'
@@ -22,6 +23,164 @@ const messagesUrl = (config: ApiConfig) => `${v1Url(config)}/messages`
 const filesUrl = (config: ApiConfig) => `${v1Url(config)}/files`
 
 const isDeepSeek = (config: ApiConfig) => config.provider === 'deepseek'
+const isOpenAI = (config: ApiConfig) => config.provider === 'openai'
+
+const openAiMessages = (body: CreateMessageRequest) => {
+  const system =
+    typeof body.system === 'string'
+      ? body.system
+      : body.system.map((block) => block.text).join('\n\n')
+  const messages = body.messages.flatMap((message) => {
+    if (message.role === 'latest_reminder') {
+      return []
+    }
+    const content =
+      typeof message.content === 'string'
+        ? message.content
+        : message.content
+            .flatMap((block) =>
+              block.type === 'text'
+                ? [block.text]
+                : block.type === 'thinking'
+                  ? [block.thinking]
+                  : []
+            )
+            .join('')
+    return content ? [{ role: message.role, content }] : []
+  })
+  return [{ role: 'system', content: system }, ...messages]
+}
+
+const readOpenAiUsage = (value: unknown): MessageUsage | undefined => {
+  if (!value || typeof value !== 'object') {
+    return undefined
+  }
+  const usage = value as { prompt_tokens?: unknown; completion_tokens?: unknown }
+  if (typeof usage.prompt_tokens !== 'number' || typeof usage.completion_tokens !== 'number') {
+    return undefined
+  }
+  return {
+    input_tokens: usage.prompt_tokens,
+    cache_creation_input_tokens: 0,
+    cache_read_input_tokens: 0,
+    output_tokens: usage.completion_tokens,
+  }
+}
+
+const openAiStopReason = (reason: unknown): 'end_turn' | 'max_tokens' =>
+  reason === 'length' ? 'max_tokens' : 'end_turn'
+
+/** Convert OpenAI Chat Completions chunks into the app's Anthropic-shaped stream events. */
+async function* streamOpenAiMessage(
+  config: ApiConfig,
+  body: CreateMessageRequest,
+  signal: AbortSignal
+): AsyncGenerator<MessageStreamEvent> {
+  const response = await request(`${v1Url(config)}/chat/completions`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${config.apiKey ?? ''}`,
+      'Content-Type': 'application/json',
+      Accept: 'text/event-stream',
+    },
+    body: JSON.stringify({
+      model: body.model,
+      messages: openAiMessages(body),
+      stream: true,
+      stream_options: { include_usage: true },
+      ...(body.max_tokens ? { max_tokens: body.max_tokens } : {}),
+    }),
+    signal,
+  })
+  const contentType = response.headers.get('Content-Type') ?? ''
+  if (!response.body || !contentType.includes('text/event-stream')) {
+    throw await readErrorResponse(response, 'protocol', '')
+  }
+
+  yield {
+    type: 'message_start',
+    message: {
+      id: '',
+      model: body.model,
+      usage: {
+        input_tokens: 0,
+        cache_creation_input_tokens: 0,
+        cache_read_input_tokens: 0,
+        output_tokens: 0,
+      },
+    },
+  }
+
+  let textStarted = false
+  let stopReason: ReturnType<typeof openAiStopReason> = 'end_turn'
+  let usage: ReturnType<typeof readOpenAiUsage>
+  for await (const { event: eventName, data } of readServerSentEvents(response.body, signal)) {
+    if (data === '[DONE]') {
+      if (textStarted) {
+        yield { type: 'content_block_stop', index: 0 }
+      }
+      yield {
+        type: 'message_delta',
+        delta: { stop_reason: stopReason, stop_sequence: null },
+        usage,
+      }
+      yield { type: 'message_stop' }
+      return
+    }
+
+    let payload: unknown
+    try {
+      payload = JSON.parse(data)
+    } catch {
+      if (eventName !== 'error') {
+        continue
+      }
+      throw new ApiError('stream', data)
+    }
+    if (isErrorBody(payload)) {
+      throw new ApiError('stream', payload.error.message)
+    }
+    if (typeof payload !== 'object' || payload === null) {
+      continue
+    }
+    const chunk = payload as {
+      choices?: { delta?: { content?: unknown; refusal?: unknown }; finish_reason?: unknown }[]
+      usage?: unknown
+    }
+    usage = readOpenAiUsage(chunk.usage) ?? usage
+    const choice = chunk.choices?.[0]
+    if (!choice) {
+      continue
+    }
+    if (choice.finish_reason !== null && choice.finish_reason !== undefined) {
+      stopReason = openAiStopReason(choice.finish_reason)
+    }
+    const delta = choice.delta
+    const content =
+      typeof delta?.content === 'string'
+        ? delta.content
+        : typeof delta?.refusal === 'string'
+          ? delta.refusal
+          : ''
+    if (!content) {
+      continue
+    }
+    if (!textStarted) {
+      textStarted = true
+      yield {
+        type: 'content_block_start',
+        index: 0,
+        content_block: { type: 'text', text: '' },
+      }
+    }
+    yield {
+      type: 'content_block_delta',
+      index: 0,
+      delta: { type: 'text_delta', text: content },
+    }
+  }
+  throw new ApiError('interrupted', '')
+}
 
 export type ApiErrorKind =
   /** 非 2xx 响应 */
@@ -161,6 +320,10 @@ export async function* streamMessage(
   body: CreateMessageRequest,
   signal: AbortSignal
 ): AsyncGenerator<MessageStreamEvent> {
+  if (isOpenAI(config)) {
+    yield* streamOpenAiMessage(config, body, signal)
+    return
+  }
   const response = await request(messagesUrl(config), {
     method: 'POST',
     headers: {

@@ -105,14 +105,15 @@ export const en = {
   avatarMenuSettingsDialogThemeSelectSystemOption: 'System',
   apiKeyStart: 'API configuration',
   apiConfigHelp:
-    'Use an Anthropic Messages-compatible API. DeepSeek verifies the key when saved; other services on first request. Configuration stays in this browser.',
+    'Use an Anthropic Messages or OpenAI Chat Completions-compatible API. DeepSeek verifies the key when saved; other services on first request. Configuration stays in this browser.',
   apiConfigRequired: 'Enter an API address, model, and API Key.',
   apiBaseUrlInvalid:
     'Use an HTTPS URL without credentials or query parameters. HTTP is allowed for localhost.',
   apiProvider: 'Provider',
+  openAiCompatible: 'OpenAI compatible',
   customApi: 'Custom API',
   apiBaseUrl: 'API address',
-  apiBaseUrlPlaceholder: 'Anthropic-compatible API base URL',
+  apiBaseUrlPlaceholder: 'Anthropic or OpenAI-compatible API base URL',
   apiModel: 'Model',
   apiModelPlaceholder: 'Enter a model name',
   apiFeatureUnavailable: 'This feature is unavailable for the selected provider.',

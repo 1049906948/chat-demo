@@ -7,7 +7,7 @@ export type Locale = 'zh-CN' | 'en-US'
 /** 主题偏好；默认跟随系统 */
 export type ThemePreference = 'light' | 'dark' | 'system'
 
-export type ApiProvider = 'deepseek' | 'aliyun' | 'custom'
+export type ApiProvider = 'deepseek' | 'aliyun' | 'openai' | 'custom'
 
 export type ApiConfig = {
   provider: ApiProvider
@@ -26,6 +26,11 @@ export const DEFAULT_API_CONFIG: Record<ApiProvider, Omit<ApiConfig, 'apiKey'>> 
     provider: 'aliyun',
     apiBaseUrl: 'https://dashscope.aliyuncs.com/apps/anthropic',
     model: 'qwen3.8-max',
+  },
+  openai: {
+    provider: 'openai',
+    apiBaseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+    model: 'qwen-plus',
   },
   custom: {
     provider: 'custom',
@@ -122,7 +127,7 @@ const initialTtsVoice = (): TtsVoice => (read(KEYS.ttsVoice) === 'tide' ? 'tide'
 
 const initialApiProvider = (): ApiProvider => {
   const saved = read(KEYS.apiProvider)
-  return saved === 'aliyun' || saved === 'custom' ? saved : 'deepseek'
+  return saved === 'aliyun' || saved === 'openai' || saved === 'custom' ? saved : 'deepseek'
 }
 
 const initialApiConfig = () => {
@@ -137,6 +142,9 @@ const initialApiConfig = () => {
 }
 
 export const isDeepSeekProvider = (provider: ApiProvider) => provider === 'deepseek'
+
+export const isAnthropicProvider = (provider: ApiProvider) =>
+  provider === 'deepseek' || provider === 'aliyun' || provider === 'custom'
 
 export const getApiConfig = (): ApiConfig => {
   const state = useSettings.getState()

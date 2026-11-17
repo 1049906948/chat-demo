@@ -4,7 +4,7 @@ import { ApiError, streamMessage } from '../api/client.js'
 import type { CreateMessageRequest } from '../api/types.js'
 import { extractFileIds, getFileErrorCode, isRetryableApiError } from '../api/errors.js'
 import { cancelUpload, describeUploadError, uploadAttachment, useUploads } from '../attachments.js'
-import { getApiConfig, isDeepSeekProvider, useSettings } from '../settings.js'
+import { getApiConfig, isAnthropicProvider, isDeepSeekProvider, useSettings } from '../settings.js'
 import { appendBranch, getVisibleMessages, normalizeSession, selectVersion } from './branches.js'
 import * as db from './db.js'
 import {
@@ -271,7 +271,7 @@ const createReply = (): AssistantMessage => {
       apiBaseUrl: apiConfig.apiBaseUrl,
       model: apiConfig.model,
     },
-    thinking: apiConfig.provider !== 'custom' && thinking,
+    thinking: isAnthropicProvider(apiConfig.provider) && thinking,
     search: search && isDeepSeekProvider(apiConfig.provider),
     prefix: isDeepSeekProvider(apiConfig.provider),
     status: 'pending',
@@ -723,7 +723,7 @@ export const continueReply = (sessionId: string, messageId: string) => {
   const reply: AssistantMessage = {
     ...previous,
     model: previous.model || apiConfig.model,
-    thinking: previous.thinking ?? (apiConfig.provider !== 'custom' && thinking),
+    thinking: previous.thinking ?? (isAnthropicProvider(apiConfig.provider) && thinking),
     search: previous.search ?? (isDeepSeekProvider(apiConfig.provider) && search),
     status: 'pending',
     stopReason: undefined,
@@ -1035,7 +1035,7 @@ const streamReply = async (sessionId: string, initial: AssistantMessage, request
             model: apiConfig.model || initial.model || 'deepseek-flash',
             system,
             messages,
-            ...(apiConfig.provider !== 'custom'
+            ...(isAnthropicProvider(apiConfig.provider)
               ? {
                   thinking: {
                     type: initial.thinking ? ('enabled' as const) : ('disabled' as const),
