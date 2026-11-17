@@ -110,7 +110,7 @@ export const en = {
   apiBaseUrlInvalid:
     'Use an HTTPS URL without credentials or query parameters. HTTP is allowed for localhost.',
   apiProvider: 'Provider',
-  openAiCompatible: 'OpenAI compatible',
+  openAiCompatible: 'Bailian OpenAI compatible',
   customApi: 'Custom API',
   apiBaseUrl: 'API address',
   apiBaseUrlPlaceholder: 'Anthropic or OpenAI-compatible API base URL',

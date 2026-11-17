@@ -104,7 +104,7 @@ export const zh = {
   apiConfigRequired: '请填写 API 地址、模型和 API Key。',
   apiBaseUrlInvalid: '请输入不含账号、查询参数的 HTTPS 接口地址；本机服务可使用 HTTP。',
   apiProvider: '服务商',
-  openAiCompatible: 'OpenAI 兼容',
+  openAiCompatible: '百炼 OpenAI 兼容',
   customApi: '自定义 API',
   apiBaseUrl: 'API 地址',
   apiBaseUrlPlaceholder: '请输入 Anthropic 或 OpenAI 兼容 API 地址',

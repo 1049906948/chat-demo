@@ -61,8 +61,8 @@ const Input = ({ sessionId }: { sessionId: string | null }) => {
   const search = useSettings((state) => state.search)
   const provider = useSettings((state) => state.apiProvider)
   const deepSeekFeatures = isDeepSeekProvider(provider)
-  const searchAvailable = deepSeekFeatures
-  const thinkingAvailable = provider !== 'custom' && provider !== 'openai'
+  const searchAvailable = deepSeekFeatures || provider === 'openai'
+  const thinkingAvailable = provider !== 'custom'
   const fileInputRef = useRef<HTMLInputElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const togglesRef = useRef<HTMLDivElement>(null)

@@ -33,15 +33,15 @@ Open **Settings → Data → API configuration**, select a provider, and enter t
 
 - **DeepSeek** defaults to `https://api.deepseek.com/anthropic` with `deepseek-flash`, including search, link reading, attachments, speech, and eligible reply continuation.
 - **Alibaba Cloud Model Studio** defaults to `https://dashscope.aliyuncs.com/apps/anthropic` with `qwen3.8-max`, supporting streaming text and thinking. Adjust the endpoint and model for your key's region and enabled models; see the [Anthropic-compatible API documentation](https://help.aliyun.com/zh/model-studio/anthropic-api-messages).
-- **OpenAI compatible** defaults to Alibaba Cloud Model Studio's `https://dashscope.aliyuncs.com/compatible-mode/v1` endpoint and `qwen-plus`, supporting streaming text. Adjust the endpoint, model, and regional key for your provider.
+- **Bailian OpenAI compatible** defaults to `https://dashscope.aliyuncs.com/compatible-mode/v1` with `qwen-plus`, supporting streaming chat, deep thinking, and web search when the selected model supports them. This protocol does not return search source lists or citation markers; adjust the endpoint and regional key as needed.
 - **Custom API** accepts an Anthropic Messages-compatible base URL and model name for streaming text. The base URL should not include `/messages`.
 
-DeepSeek verifies keys through `/models` before saving. Other services validate them on the first chat request. The API service must allow browser cross-origin requests. Search, attachments, speech, and reply continuation are currently available only with DeepSeek; switch back before regenerating an older question with attachments.
+DeepSeek verifies keys through `/models` before saving. Other services validate them on the first chat request. The API service must allow browser cross-origin requests. Bailian OpenAI-compatible search does not return source lists; link reading, attachments, speech, and reply continuation remain DeepSeek-only. Switch back before regenerating an older question with attachments.
 
 ## Features
 
 - Multiple conversations with automatic titles, renaming, and deletion; edit prompts, regenerate replies, and switch between message branches.
-- Streaming replies, deep thinking, smart search, link reading, and source citations; stop generation or continue eligible replies.
+- Streaming replies, deep thinking, and smart search; DeepSeek also supports link reading, source citations, and eligible reply continuation.
 - Upload, paste, or drag and drop attachments; use voice input and read replies aloud. A live audio spectrum appears in the first row of the input area while recording on mobile.
 - Markdown, syntax highlighting, KaTeX math, and Mermaid diagrams.
 - Simplified Chinese and English, light and dark themes, mobile layouts, location settings, and chat history import and export.

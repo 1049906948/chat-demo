@@ -257,7 +257,7 @@ export const bindChatPersistence = () => {
   }
 }
 
-/** 按当前开关创建回复：深度思考对应 thinking，智能搜索控制 deepseek_web_search。 */
+/** 按当前服务商与开关创建回复；百炼 OpenAI 兼容能力由请求扩展参数启用。 */
 const createReply = (): AssistantMessage => {
   const { thinking, search } = useSettings.getState()
   const apiConfig = getApiConfig()
@@ -271,8 +271,9 @@ const createReply = (): AssistantMessage => {
       apiBaseUrl: apiConfig.apiBaseUrl,
       model: apiConfig.model,
     },
-    thinking: isAnthropicProvider(apiConfig.provider) && thinking,
-    search: search && isDeepSeekProvider(apiConfig.provider),
+    thinking: (isAnthropicProvider(apiConfig.provider) || apiConfig.provider === 'openai') && thinking,
+    search:
+      search && (isDeepSeekProvider(apiConfig.provider) || apiConfig.provider === 'openai'),
     prefix: isDeepSeekProvider(apiConfig.provider),
     status: 'pending',
     blocks: [],
@@ -723,8 +724,12 @@ export const continueReply = (sessionId: string, messageId: string) => {
   const reply: AssistantMessage = {
     ...previous,
     model: previous.model || apiConfig.model,
-    thinking: previous.thinking ?? (isAnthropicProvider(apiConfig.provider) && thinking),
-    search: previous.search ?? (isDeepSeekProvider(apiConfig.provider) && search),
+    thinking:
+      previous.thinking ??
+      ((isAnthropicProvider(apiConfig.provider) || apiConfig.provider === 'openai') && thinking),
+    search:
+      previous.search ??
+      (search && (isDeepSeekProvider(apiConfig.provider) || apiConfig.provider === 'openai')),
     status: 'pending',
     stopReason: undefined,
     stopDetails: undefined,
@@ -1039,6 +1044,14 @@ const streamReply = async (sessionId: string, initial: AssistantMessage, request
               ? {
                   thinking: {
                     type: initial.thinking ? ('enabled' as const) : ('disabled' as const),
+                  },
+                }
+              : {}),
+            ...(apiConfig.provider === 'openai'
+              ? {
+                  openai_compatible: {
+                    enable_thinking: initial.thinking ?? false,
+                    enable_search: initial.search ?? false,
                   },
                 }
               : {}),

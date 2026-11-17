@@ -33,15 +33,15 @@ pnpm build
 
 - **DeepSeek**：默认地址为 `https://api.deepseek.com/anthropic`，模型为 `deepseek-flash`，保留搜索、链接阅读、附件、语音和继续生成等功能。
 - **阿里云百炼**：预填地址为 `https://dashscope.aliyuncs.com/apps/anthropic`，模型为 `qwen3.8-max`，支持流式文本聊天和深度思考。请根据 Key 所属地域及已开通模型调整配置，地址与模型规则见[百炼 Anthropic 兼容接口文档](https://help.aliyun.com/zh/model-studio/anthropic-api-messages)。
-- **OpenAI 兼容**：预填百炼兼容地址 `https://dashscope.aliyuncs.com/compatible-mode/v1` 和模型 `qwen-plus`，支持流式文本聊天；可按服务商文档替换地址、模型和地域对应的 Key。
+- **百炼 OpenAI 兼容**：预填兼容地址 `https://dashscope.aliyuncs.com/compatible-mode/v1` 和模型 `qwen-plus`，支持流式聊天、深度思考与联网搜索；功能需所选模型支持。该协议不返回搜索来源列表或引用角标；可按地域调整地址和 Key。
 - **自定义 API**：填写兼容 Anthropic Messages 的 Base URL 和模型名，支持流式文本聊天；Base URL 不包含 `/messages`。
 
-DeepSeek 在保存时通过 `/models` 验证 Key；其他服务在首次发送时返回实际校验结果。API 服务需要允许浏览器跨域请求。非 DeepSeek 服务暂不接入搜索、附件、语音及回答续写；包含附件的旧问题需切回 DeepSeek 后重新生成。
+DeepSeek 在保存时通过 `/models` 验证 Key；其他服务在首次发送时返回实际校验结果。API 服务需要允许浏览器跨域请求。百炼 OpenAI 兼容的搜索不返回来源列表；链接阅读、附件、语音及回答续写仍仅支持 DeepSeek，包含附件的旧问题需切回 DeepSeek 后重新生成。
 
 ## 功能
 
 - 多会话、自动标题、重命名与删除；编辑提问、重新生成和切换消息分支。
-- 流式回答、深度思考、智能搜索、链接阅读与来源引用；支持停止和符合条件的继续生成。
+- 流式回答、深度思考与智能搜索；DeepSeek 支持链接阅读、来源引用及符合条件的继续生成。
 - 附件上传、粘贴与拖拽，语音输入和回复朗读；移动端录音时输入框首行显示实时频谱。
 - Markdown、代码高亮、KaTeX 公式和 Mermaid 图表。
 - 简体中文与英文、浅色与深色主题、移动端布局、位置设置、历史导入导出。

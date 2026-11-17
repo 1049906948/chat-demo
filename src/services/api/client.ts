@@ -41,9 +41,7 @@ const openAiMessages = (body: CreateMessageRequest) => {
             .flatMap((block) =>
               block.type === 'text'
                 ? [block.text]
-                : block.type === 'thinking'
-                  ? [block.thinking]
-                  : []
+                : []
             )
             .join('')
     return content ? [{ role: message.role, content }] : []
@@ -89,6 +87,12 @@ async function* streamOpenAiMessage(
       stream: true,
       stream_options: { include_usage: true },
       ...(body.max_tokens ? { max_tokens: body.max_tokens } : {}),
+      ...(body.openai_compatible
+        ? {
+            enable_thinking: body.openai_compatible.enable_thinking,
+            enable_search: body.openai_compatible.enable_search,
+          }
+        : {}),
     }),
     signal,
   })
@@ -111,13 +115,18 @@ async function* streamOpenAiMessage(
     },
   }
 
-  let textStarted = false
+  let nextBlockIndex = 0
+  let thinkingIndex: number | undefined
+  let textIndex: number | undefined
   let stopReason: ReturnType<typeof openAiStopReason> = 'end_turn'
   let usage: ReturnType<typeof readOpenAiUsage>
   for await (const { event: eventName, data } of readServerSentEvents(response.body, signal)) {
     if (data === '[DONE]') {
-      if (textStarted) {
-        yield { type: 'content_block_stop', index: 0 }
+      if (thinkingIndex !== undefined) {
+        yield { type: 'content_block_stop', index: thinkingIndex }
+      }
+      if (textIndex !== undefined) {
+        yield { type: 'content_block_stop', index: textIndex }
       }
       yield {
         type: 'message_delta',
@@ -144,7 +153,10 @@ async function* streamOpenAiMessage(
       continue
     }
     const chunk = payload as {
-      choices?: { delta?: { content?: unknown; refusal?: unknown }; finish_reason?: unknown }[]
+      choices?: {
+        delta?: { content?: unknown; reasoning_content?: unknown; refusal?: unknown }
+        finish_reason?: unknown
+      }[]
       usage?: unknown
     }
     usage = readOpenAiUsage(chunk.usage) ?? usage
@@ -156,6 +168,25 @@ async function* streamOpenAiMessage(
       stopReason = openAiStopReason(choice.finish_reason)
     }
     const delta = choice.delta
+    const reasoning =
+      body.openai_compatible?.enable_thinking && typeof delta?.reasoning_content === 'string'
+        ? delta.reasoning_content
+        : ''
+    if (reasoning) {
+      if (thinkingIndex === undefined) {
+        thinkingIndex = nextBlockIndex++
+        yield {
+          type: 'content_block_start',
+          index: thinkingIndex,
+          content_block: { type: 'thinking', thinking: '', signature: '' },
+        }
+      }
+      yield {
+        type: 'content_block_delta',
+        index: thinkingIndex,
+        delta: { type: 'thinking_delta', thinking: reasoning },
+      }
+    }
     const content =
       typeof delta?.content === 'string'
         ? delta.content
@@ -165,17 +196,17 @@ async function* streamOpenAiMessage(
     if (!content) {
       continue
     }
-    if (!textStarted) {
-      textStarted = true
+    if (textIndex === undefined) {
+      textIndex = nextBlockIndex++
       yield {
         type: 'content_block_start',
-        index: 0,
+        index: textIndex,
         content_block: { type: 'text', text: '' },
       }
     }
     yield {
       type: 'content_block_delta',
-      index: 0,
+      index: textIndex,
       delta: { type: 'text_delta', text: content },
     }
   }

@@ -82,7 +82,7 @@ export type AssistantMessage = MessageBranch & {
   apiConfig?: Omit<ApiConfig, 'apiKey'>
   /** 请求时是否开启深度思考 */
   thinking?: boolean
-  /** 请求时是否声明 deepseek_web_search；关闭时仍声明 deepseek_read_url */
+  /** 请求时是否启用服务商的联网搜索能力 */
   search?: boolean
   /** 本轮请求的系统信息快照；各回答版本独立保存，续写沿用。历史消息中缺省的快照保持为空。 */
   latestReminder?: string

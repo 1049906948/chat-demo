@@ -177,6 +177,8 @@ export type CreateMessageRequest = {
   system: string | { type: 'text'; text: string }[]
   messages: MessageParam[]
   thinking?: { type: 'enabled' | 'disabled' }
+  /** 百炼 OpenAI 兼容接口扩展参数；仅由 Chat Completions 适配器发送。 */
+  openai_compatible?: { enable_thinking: boolean; enable_search: boolean }
   max_tokens?: number
   tools: (DeepseekWebSearchTool | DeepseekReadUrlTool)[]
   safety_check?: { level: 'high' }
