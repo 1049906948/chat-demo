@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useId, useState } from 'react'
 import { IconEditOutline16 } from '../base/icons.js'
 import { useSettings } from '../../services/settings.js'
 import { useIsMobile } from '../../app/viewport.js'
@@ -25,6 +25,7 @@ type ApiKeyEditor = ReturnType<typeof useApiKeyEditor>
 export const ApiKeyField = ({ editor }: { editor: ApiKeyEditor }) => {
   const t = useTranslate()
   const isMobile = useIsMobile()
+  const apiKeyId = useId()
   const { apiKey, config, editing, setEditing, form, showInput } = editor
 
   return (
@@ -90,39 +91,42 @@ export const ApiKeyField = ({ editor }: { editor: ApiKeyEditor }) => {
                 spellCheck={false}
               />
             </label>
-            <div className={styles.apiKeyInput}>
-              <input
-                type="password"
-                aria-label="API Key"
-                disabled={form.verifying}
-                placeholder={t('apiKeyPlaceholder')}
-                autoComplete="off"
-                spellCheck={false}
-                // 移动端打开设置时不弹键盘，点编辑后才聚焦
-                autoFocus={!isMobile || editing}
-                value={form.value}
-                onChange={(event) => form.setValue(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter' && !event.nativeEvent.isComposing) {
-                    void form.submit()
-                  }
-                }}
-              />
-              {!isMobile && form.canSubmit ? (
-                <>
-                  <span className={styles.divider} />
-                  <button
-                    type="button"
-                    className={styles.confirm}
-                    disabled={form.verifying}
-                    // 保持输入框焦点
-                    onMouseDown={(event) => event.preventDefault()}
-                    onClick={() => void form.submit()}
-                  >
-                    {form.verifying ? t('apiKeyVerifying') : t('confirm')}
-                  </button>
-                </>
-              ) : null}
+            <div className={styles.apiConfigField}>
+              <label htmlFor={apiKeyId}>API Key</label>
+              <div className={styles.apiKeyInput}>
+                <input
+                  id={apiKeyId}
+                  type="password"
+                  disabled={form.verifying}
+                  placeholder={t('apiKeyPlaceholder')}
+                  autoComplete="off"
+                  spellCheck={false}
+                  // 移动端打开设置时不弹键盘，点编辑后才聚焦
+                  autoFocus={!isMobile || editing}
+                  value={form.value}
+                  onChange={(event) => form.setValue(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' && !event.nativeEvent.isComposing) {
+                      void form.submit()
+                    }
+                  }}
+                />
+                {!isMobile && form.canSubmit ? (
+                  <>
+                    <span className={styles.divider} />
+                    <button
+                      type="button"
+                      className={styles.confirm}
+                      disabled={form.verifying}
+                      // 保持输入框焦点
+                      onMouseDown={(event) => event.preventDefault()}
+                      onClick={() => void form.submit()}
+                    >
+                      {form.verifying ? t('apiKeyVerifying') : t('confirm')}
+                    </button>
+                  </>
+                ) : null}
+              </div>
             </div>
           </div>
         )}
